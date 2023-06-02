@@ -84,10 +84,17 @@ export default class MyCssWebpackPlugin {
    
    private output(pathname: string, filename: string, string: string) {
       try {
-         if (!fs.existsSync(pathname)) {
-            fs.mkdirSync(pathname)
+         const filePathName = path.resolve(pathname, filename.replace(/^[\\\/]/g, ""))
+
+         const directory = path.dirname(filePathName)
+
+         const relativePathname = path.relative(process.cwd(), directory)
+         
+         if (!fs.existsSync(relativePathname)) {
+            fs.mkdirSync(relativePathname, { recursive: true })
          }
-         fs.writeFileSync(path.join(pathname, filename), string)
+
+         fs.writeFileSync(filePathName, string)
       } catch (e) {
          const error = e as Error
          Logger.error(this.name, error)

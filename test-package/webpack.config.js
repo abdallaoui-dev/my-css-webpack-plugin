@@ -23,7 +23,7 @@ const wconfig = {
          entry: {
             style: {
                filePathName: joinPath("src/css/style.css"),
-               outputFilename: "style.css"
+               outputFilename: "desktop/style.css"
             },
             main: {
                filePathName: joinPath("src/css/main.css"),
