@@ -1,0 +1,7 @@
+.utils {
+   content: "the util";
+   // hello world
+   &-world {
+      content: "sub class";
+   }
+}
