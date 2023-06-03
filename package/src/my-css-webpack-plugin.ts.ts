@@ -63,26 +63,29 @@ export default class MyCssWebpackPlugin {
          pattern: "@?import"
       })
 
-      try {
-         for (const key in this.options.entry) {
-            const target = this.options.entry[key]
+      for (const key in this.options.entry) {
+         const target = this.options.entry[key]
+         
+         let { source, filePathNames } = fileBundler.bundle(target.filePathName)
+
+         filePathNames.forEach(filePathName => {
+            this.filePathNameCache.add(filePathName)
+            compilation.fileDependencies.add(filePathName)
+         })
+   
+         try {
             
-            let { source, filePathNames } = fileBundler.bundle(target.filePathName)
-      
             source = sass.compileString(source, {
-               style: minify ? "compressed" : "expanded"
+               style: minify ? "compressed" : "expanded",
+               alertColor: false
             }).css
-            
-            filePathNames.forEach(filePathName => {
-               this.filePathNameCache.add(filePathName)
-               compilation.fileDependencies.add(filePathName)
-            })
-            
+
             this.output(this.options.output.path, target.outputFilename, source)
+         } catch (e) {
+            const error = e as Error
+            Logger.error(this.name, error)
          }
-      } catch (e) {
-         const error = e as Error
-         Logger.error(this.name, error)
+      
       }
    }
    
