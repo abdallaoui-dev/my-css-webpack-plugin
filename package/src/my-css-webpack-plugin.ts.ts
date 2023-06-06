@@ -24,7 +24,7 @@ type __my_css_webpack_plugin_options = {
 
 export default class MyCssWebpackPlugin {
    private name = "MyCssWebpackPlugin"
-   private filePathNameCache = new Set<string>()
+   private filePathNames = new Set<string>()
    private options
 
    constructor(options: __my_css_webpack_plugin_options) {
@@ -43,7 +43,7 @@ export default class MyCssWebpackPlugin {
 
    private handleExternalCssFiles(compiler: Compiler, compilation: Compilation) {
       
-      const modifiedFile = this.getFileModifiedFile(compiler)
+      const modifiedFile = this.getModifiedFile(compiler)
 
       if (!this.options.output || !this.options.output.path) {
          Logger.error(this.name, `the output path is missing.`)
@@ -51,8 +51,6 @@ export default class MyCssWebpackPlugin {
       }
 
       if (modifiedFile && !modifiedFile.match(/(\.css|\.scss)$/)) {
-         this.filePathNameCache.forEach(filename => compilation.fileDependencies.add(filename))
-         // console.log("donnot bundle css and keep watching")
          return
       }
 
@@ -68,17 +66,20 @@ export default class MyCssWebpackPlugin {
          
          let { source, filePathNames } = fileBundler.bundle(target.filePathName)
 
+         let hasSCSSFiles = false
          filePathNames.forEach(filePathName => {
-            this.filePathNameCache.add(filePathName)
-            compilation.fileDependencies.add(filePathName)
+            this.filePathNames.add(filePathName)
+            if (filePathName.endsWith(".scss")) hasSCSSFiles = true
          })
    
          try {
-            
-            source = sass.compileString(source, {
-               style: minify ? "compressed" : "expanded",
-               alertColor: false
-            }).css
+
+            if (hasSCSSFiles || minify) {
+               source = sass.compileString(source, {
+                  style: minify ? "compressed" : "expanded",
+                  alertColor: false
+               }).css
+            }
 
             this.output(this.options.output.path, target.outputFilename, source)
          } catch (e) {
@@ -87,9 +88,23 @@ export default class MyCssWebpackPlugin {
          }
       
       }
+
+      /* this prevents the hard reload */
+      this.disableWebpackOutput(compiler, compilation)
    }
    
-   private output(pathname: string, filename: string, string: string) {
+   private handleCompilationAssets = (compiler: Compiler, compilation: Compilation) => {
+      this.handleExternalCssFiles(compiler, compilation)
+      compilation.fileDependencies.addAll(this.filePathNames)
+   }
+
+   private getModifiedFile(compiler: Compiler) {
+      const modifiedFiles = compiler.modifiedFiles
+      if (!modifiedFiles) return null
+      return [...modifiedFiles][0] || null
+   }
+
+   private output(pathname: string, filename: string, source: string) {
       try {
          const filePathName = path.resolve(pathname, filename.replace(/^[\\\/]/g, ""))
 
@@ -101,20 +116,22 @@ export default class MyCssWebpackPlugin {
             fs.mkdirSync(relativePathname, { recursive: true })
          }
 
-         fs.writeFileSync(filePathName, string)
+         fs.writeFileSync(filePathName, source)
       } catch (e) {
          const error = e as Error
          Logger.error(this.name, error)
       }
    }
 
-   private handleCompilationAssets = (compiler: Compiler, compilation: Compilation) => {
-      this.handleExternalCssFiles(compiler, compilation)
-   }
+   private disableWebpackOutput(compiler: Compiler, compilation: Compilation) {
+      const modifiedFile = this.getModifiedFile(compiler)
 
-   private getFileModifiedFile(compiler: Compiler) {
-      const modifiedFiles = compiler.modifiedFiles
-      if (!modifiedFiles) return null
-      return [...modifiedFiles][0] || null
+      if (!modifiedFile || !modifiedFile.match(/(\.css|\.scss)$/)) return
+
+      const assets = compilation.getAssets()
+      assets.forEach(asset => {
+         if (!asset.name.match(/(\.js|\.ts)$/)) return
+         compilation.deleteAsset(asset.name)
+      })
    }
 }
